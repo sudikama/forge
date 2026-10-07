@@ -66,6 +66,12 @@ if (role === 'orchestrator') {
 
 const items = [...prompt.matchAll(/^- (W\d+) \[/gm)].map((m) => m[1])
 log(`items ${items.join(',')}`)
+// Ladder scenario: every model writes a broken W2, so the item must climb and finally block.
+if (process.env.FORGE_STUB_MODE === 'w2-always-broken') {
+  if (items.includes('W1')) w('src/price.mjs', PRICE_GOOD)
+  if (items.includes('W2')) w('src/fmt.mjs', `export function plain(n) { return String(n) }\nexport function money(n) { return 'Rp ' + n } // ${process.env.FORGE_MODEL} iter ${iter}\n`)
+  process.exit(0)
+}
 if (items.includes('W1')) {
   if (iter === 1) {
     w('src/price.mjs', PRICE_BUGGY) // linear but drops the qty default: breaks the existing suite

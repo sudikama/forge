@@ -136,11 +136,13 @@ chmod 600 ~/.forge/env
 | `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_TOKEN` | kosong | Fallback REST kalau Jira MCP tidak dipasang; juga untuk komentar laporan ke Jira |
 | `FORGE_HOME` | `~/.forge` | Lokasi state global: breaker Jev, log, instinct |
 | `routeAgents` / `FORGE_ROUTE_AGENTS` | true | Pilih model dan effort per agent loop (lane dan orchestrator) lewat Jev |
-| `fastModel` / `balancedModel` / `deepModel` | haiku / sonnet / opus | Model untuk tiap tier routing. Default tier adalah balanced |
+| `fastModel` / `balancedModel` / `deepModel` | `haiku` / `claude-sonnet-5-5` / `claude-opus-5-5` | Model untuk tiap tier dan anak tangga ladder. Default tier adalah balanced |
 | `maxEffort` / `FORGE_MAX_EFFORT` | high | Batas atas effort hasil routing (`low`, `medium`, `high`, `xhigh`) |
 | `minUpgradeConfidence` | 0.3 | Confidence Jev yang cukup untuk menaikkan tier atau effort |
 | `minDowngradeConfidence` | 0.7 | Confidence Jev yang dibutuhkan untuk menurunkan tier atau effort |
-| `FORGE_ESCALATE_AFTER_FAILS` | 2 | Item yang gagal sekian kali berturut-turut langsung naik ke tier deep dan effort high |
+| `ladderFailsFast` / `FORGE_LADDER_FAILS_FAST` | 1 | Gagal gate di haiku sekian kali, item naik ke Sonnet 5.5 |
+| `ladderFailsBalanced` / `FORGE_LADDER_FAILS_BALANCED` | 2 | Gagal gate di Sonnet 5.5 sekian kali, item naik ke Opus 5.5 |
+| `ladderFailsDeep` / `FORGE_LADDER_FAILS_DEEP` | 2 | Gagal gate di Opus 5.5 sekian kali, item jadi BLOCKED untuk Tuan |
 | `jevDecide` / `FORGE_JEV_DECIDE` | true | Jev boleh menolak temuan sendiri kalau cocok dengan baris pengecualian di spec |
 | `jevRejectBar` / `FORGE_JEV_REJECT_BAR` | 0.6 | Confidence minimum untuk penolakan oleh Jev |
 | `jevCompaction` | true | Compaction verbatim berbasis Jev di sesi interaktif (function hooks) |
@@ -284,7 +286,7 @@ Jev tidak pernah memutuskan lulus atau tidak. Itu tetap exit code tes, regresi, 
 | Titik | Yang dilakukan Jev | Pengaman deterministik |
 |---|---|---|
 | Triage prompt | menilai engineering atau bukan, ukuran, bisa paralel, ada verifier | skor verifier rendah wajib clarify |
-| Routing agent loop | memilih tier model dan effort per lane dan orchestrator | naik cukup confidence 0.3, turun butuh 0.7; item L tidak pernah fast; gagal 1 kali tidak fast; gagal 2 kali naik deep/high; orchestrator minimal balanced/medium; effort dibatasi `maxEffort` |
+| Routing agent loop | memilih tier AWAL model dan effort per lane dan orchestrator | naik cukup confidence 0.3, turun butuh 0.7; item L tidak pernah fast; setelah item lewat gate, tier diatur ladder (Jev tidak bisa menurunkannya); orchestrator minimal balanced/medium; effort dibatasi `maxEffort` |
 | Keputusan temuan | memetakan temuan ke baris Non-goals, MUST NOT, atau out of scope | penolakan hanya kalau confidence di atas `jevRejectBar` dan kutipannya valid; selain itu dilempar ke orchestrator Claude |
 | Klasifikasi kegagalan | menebak penyebab tes merah untuk mengarahkan revisi | tidak mempengaruhi verdict |
 | Compaction sesi | menilai tool call mana yang masih dibutuhkan | ref guard menyelamatkan file yang masih disebut; di bawah `minReductionRatio` atau saat error, pakai ringkasan bawaan |
@@ -293,6 +295,29 @@ Jev tidak pernah memutuskan lulus atau tidak. Itu tetap exit code tes, regresi, 
 Setiap agent loop adalah proses `claude -p` baru, jadi ganti model tidak membuang prompt cache.
 Model dan effort per lane dicatat di kolom `routes` pada `results.tsv` dan bagian "Model routing per
 iteration" di laporan, supaya bisa dinilai hemat atau boros.
+
+### Model ladder
+
+Setiap item worklist punya anak tangga model sendiri. Jev hanya memilih anak tangga awal.
+Sesudah itu yang menggerakkan adalah gate:
+
+| Tier | Model default | Gagal gate sebelum naik | Naik ke |
+|---|---|---|---|
+| fast | haiku | 1 | Sonnet 5.5 |
+| balanced | Sonnet 5.5 | 2 | Opus 5.5 |
+| deep | Opus 5.5 | 2 | BLOCKED, masuk laporan |
+
+- **Dihitung gagal** kalau: case matrix milik item itu merah, lane-nya ditolak (menyentuh file
+  locked atau di luar kepemilikan), merge conflict, lane tidak menghasilkan perubahan, atau
+  iterasi dibuang karena regresi yang terbukti berasal dari lane itu.
+- **Siapa penyebab regresi** ditentukan dengan menjalankan ulang regresi yang merah di worktree
+  tiap lane secara terpisah. Item yang hijau tapi ikut dibuang karena lane lain tidak dihitung
+  gagal (tercatat sebagai "not counted").
+- Lulus gate tidak menurunkan model. Retry di Sonnet effort-nya minimal medium, di Opus selalu high.
+- Kalau Opus juga habis jatahnya, item jadi BLOCKED dengan bukti semua percobaan (iterasi dan
+  model) plus opsi: pecah atau perjelas item, ubah spec, atau kerjakan manual. Loop lanjut ke item lain.
+- Riwayatnya ada di bagian "Model ladder" pada `report.md` dan kolom `routes` di `results.tsv`
+  (retry ditandai `#r1`).
 
 ### Function hooks (opsional)
 
@@ -384,8 +409,10 @@ node tests/unit/forge-fn.test.mjs     # function hooks dengan engine palsu; LIVE
 gate tiap tahap, lock butuh approval, iterasi dengan regresi dibuang, lane yang menyentuh file locked
 ditolak, keputusan orchestrator dengan kutipan valid, kutipan palsu jadi BLOCKED, usulan tiket, isi
 laporan, instinct terbawa ke task berikutnya, branch dasar tidak tersentuh, routing model per lane
-(slice kecil ke haiku, naik lagi setelah iterasi gagal), temuan Non-goal ditolak Jev tanpa memanggil
-orchestrator, dan orchestrator tidak pernah di bawah sonnet.
+(slice kecil ke haiku), ladder (haiku gagal sekali langsung ke Sonnet 5.5, regresi diatribusikan ke
+lane penyebab lewat re-run terpisah, item yang tidak bersalah tidak dihitung, skenario item yang selalu
+rusak naik haiku, Sonnet 5.5, Opus 5.5 lalu BLOCKED), temuan Non-goal ditolak Jev tanpa memanggil
+orchestrator, dan orchestrator tidak pernah di bawah Sonnet 5.5.
 
 ## 11. Troubleshooting
 

@@ -102,7 +102,7 @@ const size = (ms) => JSON.stringify(ms).length
   const mk = (choice, confidence) => engine({ answer: () => ({ choice, confidence }) })
   const spawn = async (E, e) => { let seen; await E.hooks['agent.spawn'].fn(E.$, e, async (x) => { seen = x; return { model: x.model || 'inherit' } }); return seen }
   const base = { prompt: 'p', subagentType: 'general-purpose', fork: false }
-  ok('deep at 0.4 upgrades to opus', (await spawn(mk('deep', 0.4), base)).model === 'opus')
+  ok('deep at 0.4 upgrades to Opus 5.5', (await spawn(mk('deep', 0.4), base)).model === 'claude-opus-5-5')
   ok('fast at 0.5 does not downgrade', (await spawn(mk('fast', 0.5), base)).model === undefined)
   ok('fast at 0.9 downgrades to haiku', (await spawn(mk('fast', 0.9), base)).model === 'haiku')
   ok('explicit model is respected', (await spawn(mk('deep', 1), { ...base, model: 'sonnet' })).model === 'sonnet')

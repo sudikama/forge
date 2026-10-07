@@ -135,9 +135,13 @@ ok("iter3 kept (W2 green)", it[2].verdict==="keep" && it[2].ac==="6/7")
 const small=(r)=>r.items.every(i=>i!=="W1")
 const r1=it[0].routes.find(small), r1a=it[0].routes.find(r=>r.items.includes("W1"))
 ok("routing: iter1 small-slice lane on haiku/low via jev", r1 && r1.model==="haiku" && r1.effort==="low" && r1.source==="jev:mock")
-ok("routing: W1 lane stays on sonnet", r1a && r1a.model==="sonnet")
+ok("routing: W1 lane starts on Sonnet 5.5", r1a && r1a.model==="claude-sonnet-5-5")
 const r2=it[1].routes.find(small)
-ok("routing: after a discarded iteration the small lane is lifted off haiku", r2 && r2.model!=="haiku" && /failed once/.test(r2.why))
+ok("ladder: iter1 regression blamed on W1 alone (isolated re-run), a retry on sonnet", (it[0].ladder||[]).some(e=>e.kind==="retry" && e.item==="W1" && e.tier==="balanced" && /red on this lane alone/.test(e.why)))
+ok("ladder: W2 green on haiku in a discarded iteration is not counted", !(it[0].ladder||[]).some(e=>e.item==="W2") && r2 && r2.model==="haiku")
+ok("ladder: W2 rejected on haiku in iter2 escalates at once to Sonnet 5.5", (it[1].ladder||[]).some(e=>e.kind==="escalate" && e.item==="W2" && e.from==="fast" && e.to==="balanced"))
+const r3=it[2].routes.find(small)
+ok("ladder: iter3 W2 runs on Sonnet 5.5 and passes", r3 && r3.model==="claude-sonnet-5-5" && /ladder balanced/.test(r3.why) && it[2].verdict==="keep")
 ' $TD/iterations.json | tee -a /tmp/forge-e2e-asserts; grep -q FAIL /tmp/forge-e2e-asserts 2>/dev/null && FAIL=1; rm -f /tmp/forge-e2e-asserts
 
 f=$($FORGE findings)
@@ -151,7 +155,7 @@ const o=by("other"); const ng=require("fs").readFileSync(process.env.TD+"/spec.m
 ok("jev rejects the non-goal finding itself, citing the Non-goals line", o?.status==="rejected" && o.decision.by==="jev" && o.decision.cite==="spec.md:L"+ng)
 ok("orchestrator agent was never spawned for the jev-rejected finding", !require("fs").readdirSync(process.env.TD+"/agents").some(f=>f.includes("orchestrator-"+o?.id)))
 const sg=by("spec_gap")
-ok("orchestrator routed, never below sonnet", sg?.route?.model==="sonnet")
+ok("orchestrator routed, never below sonnet", sg?.route?.model==="claude-sonnet-5-5")
 ' <<< "$f" | tee /tmp/forge-e2e-asserts2; grep -q FAIL /tmp/forge-e2e-asserts2 && FAIL=1; rm -f /tmp/forge-e2e-asserts2
 
 rep=$(cat $TD/report.md)
@@ -160,6 +164,7 @@ expect "report proposes new ticket" "$rep" 'report.line ignores currency formatt
 expect "report shows W3 blocked" "$rep" 'W3 \[blocked\]'
 expect "report metric curve" "$rep" 'baseline 499500'
 expect "report shows model routing" "$rep" 'Model routing per iteration'
+expect "report shows the model ladder" "$rep" 'W2: now balanced; attempts iter 1 haiku not counted, iter 2 haiku FAIL, iter 3 claude-sonnet-5-5 pass'
 expect "report attributes the jev decision" "$rep" 'rejected by jev'
 expect "results.tsv has a routes column" "$(head -1 $TD/results.tsv)" 'routes'
 expect "lane agent received its routed model" "$(cat $TD/agents/0001-lane-*.log)" 'model=haiku effort=low'
@@ -171,6 +176,33 @@ cp $TD/{goal.json,spec.md,scope.json,worklist.json,matrix.json} $R/.forge/tasks/
 $FORGE source add --kind markdown --file /tmp/forge-e2e-ticket.md >/dev/null
 $FORGE lanes >/dev/null; $FORGE baseline --force >/dev/null
 out=$($FORGE clarify); expect "next task's clarify shows the learned instinct" "$out" 'J1. Learned instincts'
+
+# Ladder: W2 broken by every model. Limits 1/1/1 keep it short: haiku -> sonnet -> opus -> BLOCKED.
+$FORGE new SHOP-3 --mode large --title ladder --report-to file >/dev/null
+cp $TD/{goal.json,spec.md,scope.json,worklist.json,matrix.json} $R/.forge/tasks/SHOP-3/
+$FORGE source add --kind markdown --file /tmp/forge-e2e-ticket.md >/dev/null
+$FORGE lanes >/dev/null; $FORGE baseline --force >/dev/null; $FORGE clarify >/dev/null
+T3=$R/.forge/tasks/SHOP-3
+for id in $(node -e 'const c=require(process.argv[1]);console.log(c.questions.map(q=>q.id).join(" "))' $T3/clarify.json); do
+  ans=$(node -e 'const c=require(process.argv[1]);const q=c.questions.find(x=>x.id===process.argv[2]);console.log(q.recommendation)' $T3/clarify.json $id)
+  [ "$id" = "E1" ] && ans=2
+  $FORGE answer "$id" "$ans" >/dev/null
+done
+$FORGE lock --approve >/dev/null
+out=$(FORGE_STUB_MODE=w2-always-broken FORGE_LADDER_FAILS_BALANCED=1 FORGE_LADDER_FAILS_DEEP=1 $FORGE run --foreground 2>&1)
+expect "ladder run ends with W2 blocked" "$out" 'every remaining item is blocked'
+FORGE_LADDER_FAILS_BALANCED=1 FORGE_LADDER_FAILS_DEEP=1 node -e '
+const it=require(process.argv[1]+"/iterations.json");const fs=require("fs");const ok=(n,c)=>console.log((c?"PASS ":"FAIL ")+n)
+const w2=it.map(i=>(i.routes||[]).find(r=>r.items.includes("W2"))).filter(Boolean).map(r=>r.model)
+ok("ladder: W2 ran haiku, then Sonnet 5.5, then Opus 5.5 ("+w2.join(" > ")+")", w2.join(",")==="haiku,claude-sonnet-5-5,claude-opus-5-5")
+const fd=fs.readdirSync(process.argv[1]+"/findings").map(f=>JSON.parse(fs.readFileSync(process.argv[1]+"/findings/"+f)))
+const ex=fd.find(f=>/after every model tier/.test(f.title))
+ok("ladder exhausted: BLOCKED finding with every attempt as evidence", ex && ex.status==="blocked" && ex.item==="W2" && /haiku failed.*claude-sonnet-5-5 failed.*claude-opus-5-5 failed/.test(ex.evidence))
+const st=JSON.parse(fs.readFileSync(process.argv[1]+"/worklist-state.json")).items
+ok("ladder: W1 done, W2 blocked by the ladder finding", st.find(i=>i.id==="W1").status==="done" && st.find(i=>i.id==="W2").status==="blocked" && st.find(i=>i.id==="W2").blocked_by===ex?.id)
+const rep=fs.readFileSync(process.argv[1]+"/report.md","utf8")
+ok("ladder: report lists it under BLOCKED with options", /still fails the gate after every model tier/.test(rep) && /clarify or split the item/.test(rep))
+' $T3 | tee /tmp/forge-e2e-asserts3; grep -q FAIL /tmp/forge-e2e-asserts3 && FAIL=1; rm -f /tmp/forge-e2e-asserts3
 
 # The loop never touched the base branch.
 [ "$(git -C $R rev-parse --abbrev-ref HEAD)" = "main" ] && [ "$(git -C $R log --oneline main | wc -l)" = "1" ] && pass "base branch untouched (forge never merges)" || fail "base branch untouched"

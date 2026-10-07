@@ -113,10 +113,10 @@ function toSessionMessages(input, output) {
   })
 }
 
-const TIER = { fast: 'haiku', balanced: 'sonnet', deep: 'opus' }
 
 /** @type {import('claude-code').Register} */
 export const register = (on, options) => {
+  const TIER = { fast: str(options, 'fastModel', 'haiku'), balanced: str(options, 'balancedModel', 'claude-sonnet-5-5'), deep: str(options, 'deepModel', 'claude-opus-5-5') }
   const compactOn = bool(options, 'jevCompaction', true)
   const minReduction = num(options, 'minReductionRatio', 0.25)
   const compactAt = num(options, 'compactAtPercent', 60)

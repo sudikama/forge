@@ -1,6 +1,6 @@
 {
   "name": "forge",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Continuous engineering loop for Claude Code: Jev-based size/clarity triage, a plan-clarify-build-test-revise harness for small tasks, and for large tasks goal+spec from Jira/Docs/PDF/PRD/Figma, codebase scope validation, detailed clarify (incl. subagent count without file collisions), spec lock, an autoresearch-style ratchet loop with an orchestrator, worktree lanes and a deterministic judge (happy/unhappy/edge/regression), BLOCKED findings, final report, and per-repo self-learning.",
   "author": {
     "name": "Kama Adhitia"
@@ -76,20 +76,20 @@
     "fastModel": {
       "type": "string",
       "title": "Fast tier model",
-      "description": "Model for mechanical slices",
+      "description": "Model for mechanical slices (first ladder rung)",
       "default": "haiku"
     },
     "balancedModel": {
       "type": "string",
       "title": "Balanced tier model",
-      "description": "Model for ordinary slices (also the default)",
-      "default": "sonnet"
+      "description": "Model for ordinary slices and the second ladder rung (default tier)",
+      "default": "claude-sonnet-5-5"
     },
     "deepModel": {
       "type": "string",
       "title": "Deep tier model",
-      "description": "Model for hard/risky slices and after repeated failures",
-      "default": "opus"
+      "description": "Model for hard/risky slices and the top ladder rung",
+      "default": "claude-opus-5-5"
     },
     "maxEffort": {
       "type": "string",
@@ -144,6 +144,24 @@
       "title": "Route session subagents",
       "description": "Pick the model of Agent-tool subagents in interactive sessions (function hooks only)",
       "default": true
+    },
+    "ladderFailsFast": {
+      "type": "number",
+      "title": "Ladder: fails on fast",
+      "description": "Gate failures on the fast tier before the item moves up (haiku -> sonnet)",
+      "default": 1
+    },
+    "ladderFailsBalanced": {
+      "type": "number",
+      "title": "Ladder: fails on balanced",
+      "description": "Gate failures on the balanced tier before the item moves up (sonnet -> opus)",
+      "default": 2
+    },
+    "ladderFailsDeep": {
+      "type": "number",
+      "title": "Ladder: fails on deep",
+      "description": "Gate failures on the deep tier before the item is BLOCKED for you",
+      "default": 2
     }
   }
 }
