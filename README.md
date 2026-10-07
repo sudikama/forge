@@ -135,6 +135,19 @@ chmod 600 ~/.forge/env
 | `FORGE_VERIFIER_THRESHOLD` | 0.3 | Di bawah nilai ini, permintaan yang tidak kecil dianggap kabur dan wajib clarify |
 | `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_TOKEN` | kosong | Fallback REST kalau Jira MCP tidak dipasang; juga untuk komentar laporan ke Jira |
 | `FORGE_HOME` | `~/.forge` | Lokasi state global: breaker Jev, log, instinct |
+| `routeAgents` / `FORGE_ROUTE_AGENTS` | true | Pilih model dan effort per agent loop (lane dan orchestrator) lewat Jev |
+| `fastModel` / `balancedModel` / `deepModel` | haiku / sonnet / opus | Model untuk tiap tier routing. Default tier adalah balanced |
+| `maxEffort` / `FORGE_MAX_EFFORT` | high | Batas atas effort hasil routing (`low`, `medium`, `high`, `xhigh`) |
+| `minUpgradeConfidence` | 0.3 | Confidence Jev yang cukup untuk menaikkan tier atau effort |
+| `minDowngradeConfidence` | 0.7 | Confidence Jev yang dibutuhkan untuk menurunkan tier atau effort |
+| `FORGE_ESCALATE_AFTER_FAILS` | 2 | Item yang gagal sekian kali berturut-turut langsung naik ke tier deep dan effort high |
+| `jevDecide` / `FORGE_JEV_DECIDE` | true | Jev boleh menolak temuan sendiri kalau cocok dengan baris pengecualian di spec |
+| `jevRejectBar` / `FORGE_JEV_REJECT_BAR` | 0.6 | Confidence minimum untuk penolakan oleh Jev |
+| `jevCompaction` | true | Compaction verbatim berbasis Jev di sesi interaktif (function hooks) |
+| `compactAtPercent` | 60 | Persentase context yang memicu compaction otomatis (function hooks) |
+| `minReductionRatio` | 0.25 | Kalau hasil compaction Jev mengecil kurang dari ini, pakai ringkasan bawaan |
+| `compactionRefGuard` | true | File yang masih disebut di goal atau pesan sesudahnya tidak boleh dibuang compaction |
+| `routeSessionSubagents` | true | Pilih model subagent tool Agent di sesi interaktif (function hooks) |
 
 Semua panggilan Jev bersifat *fail-open*. Kalau semua lane gagal, forge memakai aturan
 deterministik dan tidak pernah memblokir sesi.
@@ -264,6 +277,35 @@ Setiap tahap punya gate. `forge check` menunjukkan apa yang masih kurang.
     keputusan orchestrator, kurva metrik, dan instinct. Dikirim ke target yang dipilih di awal.
     forge tidak pernah merge atau push.
 
+### Peran Jev di forge
+
+Jev tidak pernah memutuskan lulus atau tidak. Itu tetap exit code tes, regresi, dan metrik.
+
+| Titik | Yang dilakukan Jev | Pengaman deterministik |
+|---|---|---|
+| Triage prompt | menilai engineering atau bukan, ukuran, bisa paralel, ada verifier | skor verifier rendah wajib clarify |
+| Routing agent loop | memilih tier model dan effort per lane dan orchestrator | naik cukup confidence 0.3, turun butuh 0.7; item L tidak pernah fast; gagal 1 kali tidak fast; gagal 2 kali naik deep/high; orchestrator minimal balanced/medium; effort dibatasi `maxEffort` |
+| Keputusan temuan | memetakan temuan ke baris Non-goals, MUST NOT, atau out of scope | penolakan hanya kalau confidence di atas `jevRejectBar` dan kutipannya valid; selain itu dilempar ke orchestrator Claude |
+| Klasifikasi kegagalan | menebak penyebab tes merah untuk mengarahkan revisi | tidak mempengaruhi verdict |
+| Compaction sesi | menilai tool call mana yang masih dibutuhkan | ref guard menyelamatkan file yang masih disebut; di bawah `minReductionRatio` atau saat error, pakai ringkasan bawaan |
+| Subagent sesi | memilih model subagent tool Agent | fork dan model eksplisit tidak disentuh |
+
+Setiap agent loop adalah proses `claude -p` baru, jadi ganti model tidak membuang prompt cache.
+Model dan effort per lane dicatat di kolom `routes` pada `results.tsv` dan bagian "Model routing per
+iteration" di laporan, supaya bisa dinilai hemat atau boros.
+
+### Function hooks (opsional)
+
+Compaction Jev, compaction otomatis, dan routing subagent sesi ada di `hooks/forge-fn.js`. Modul ini
+hanya aktif kalau Claude Code dijalankan dengan:
+
+```bash
+export CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1
+```
+
+Tanpa flag itu, hooks klasik (triage, gate, harness kecil) dan routing agent loop tetap jalan
+seperti biasa. API function hooks masih early access, jadi bisa berubah antar versi Claude Code.
+
 ### Self-improvement
 
 Instinct per repo disimpan di `~/.forge/learn/repos/<repo>/` (format sama dengan instinct
@@ -304,9 +346,11 @@ Target laporan: `telegram` (home channel) atau `telegram:<chat_id>[:<thread_id>]
 ```
 .claude-plugin/plugin.json        manifest dan userConfig
 .claude-plugin/marketplace.json   marketplace forge-local
-hooks/hooks.json                  SessionStart, UserPromptSubmit, PreToolUse, Stop
+hooks/hooks.json                  SessionStart, UserPromptSubmit, PreToolUse, Stop, modul forge-fn.js
+hooks/forge-fn.js                 function hooks: compaction Jev, auto-compact, routing subagent sesi
+hooks/vendor/fast-jev/            vendor fast-jev-compaction (MIT)
 bin/forge.mjs                     CLI tunggal (dipakai hooks, skill, lane)
-lib/                              jev, triage, task, lanes, judge, runner, small, clarify, learn, io, report, hooks
+lib/                              jev, triage, route, task, lanes, judge, runner, small, clarify, learn, io, report, hooks
 skills/forge-small, forge-large   instruksi untuk Claude
 commands/                         /forge:start, /forge:status, /forge:doctor
 templates/                        goal, spec, scope, worklist, matrix, prompt lane dan orchestrator
@@ -332,12 +376,16 @@ Branch loop: `forge/<KEY>` (hasil terbaik) dan `forge/<KEY>-lane-<x>`.
 ```bash
 bash tests/e2e/run-large.sh   # alur besar penuh dengan agent stub (deterministik, tanpa biaya)
 bash tests/e2e/run-small.sh   # harness kecil, gate lane, triage live (Jev zen)
+node tests/unit/route.test.mjs        # policy routing dan keputusan temuan Jev (lane mock)
+node tests/unit/forge-fn.test.mjs     # function hooks dengan engine palsu; LIVE=1 juga uji lane zen
 ```
 
 `run-large.sh` mengganti `claude -p` dengan agent stub lewat `FORGE_AGENT_CMD`, lalu memverifikasi:
 gate tiap tahap, lock butuh approval, iterasi dengan regresi dibuang, lane yang menyentuh file locked
 ditolak, keputusan orchestrator dengan kutipan valid, kutipan palsu jadi BLOCKED, usulan tiket, isi
-laporan, instinct terbawa ke task berikutnya, dan branch dasar tidak tersentuh.
+laporan, instinct terbawa ke task berikutnya, branch dasar tidak tersentuh, routing model per lane
+(slice kecil ke haiku, naik lagi setelah iterasi gagal), temuan Non-goal ditolak Jev tanpa memanggil
+orchestrator, dan orchestrator tidak pernah di bawah sonnet.
 
 ## 11. Troubleshooting
 
@@ -358,8 +406,13 @@ laporan, instinct terbawa ke task berikutnya, dan branch dasar tidak tersentuh.
 
 - Loop besar sudah diuji end-to-end dengan agent stub. Uji dengan `claude -p` sungguhan bergantung
   pada login Claude Code di mesin tersebut.
-- Routing effort per turn dan compaction berbasis Jev belum ada (butuh function hooks yang masih
-  early access).
+- Compaction Jev dan routing subagent sesi baru diuji dengan engine palsu plus lane zen sungguhan,
+  belum di dalam sesi Claude Code nyata (butuh login dan flag function hooks).
+- Confidence lane zen tidak terkalibrasi. Di probe, file yang sedang diedit sempat dinilai 0.17,
+  karena itu ada ref guard. Penolakan temuan oleh Jev di zen jarang terjadi (kecocokan sungguhan
+  hanya 0.40 sampai 0.49, di bawah bar 0.6), jadi sebagian besar temuan tetap ke orchestrator Claude.
+- Routing effort per turn di sesi interaktif (gaya jev-effort) tidak dibuat; nilainya kecil di data
+  jev-effort sendiri.
 - Threshold triage baru dikalibrasi dengan sedikit contoh. Pakai `forge triage` untuk mengecek
   permintaan yang terasa salah pilah.
 - Deteksi regresi hanya sekuat tes yang ada ditambah characterization test yang ditulis di baseline.

@@ -15,7 +15,7 @@ const taskDir = process.env.FORGE_TASK_DIR
 const FORGE = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../bin/forge.mjs')
 const w = (rel, text) => { fs.mkdirSync(path.dirname(path.join(cwd, rel)), { recursive: true }); fs.writeFileSync(path.join(cwd, rel), text) }
 const finding = (args) => execFileSync('node', [FORGE, 'finding', '--task-dir', taskDir, ...args], { cwd, env: process.env, stdio: 'inherit' })
-const log = (m) => console.log(`[stub ${role} ${process.env.FORGE_LANE || ''} iter ${iter}] ${m}`)
+const log = (m) => console.log(`[stub ${role} ${process.env.FORGE_LANE || ''} iter ${iter} model=${process.env.FORGE_MODEL || '-'} effort=${process.env.FORGE_EFFORT || '-'}] ${m}`)
 
 const PRICE_BUGGY = `export let WORK = 0
 export function total(items) {
@@ -76,6 +76,7 @@ if (items.includes('W2')) {
   w('src/fmt.mjs', FMT_GOOD)
   if (iter === 1) {
     finding(['--kind', 'preexisting_bug', '--title', 'report.line ignores currency formatting', '--evidence', 'src/report.mjs:2 prints raw number'])
+    finding(['--kind', 'other', '--title', 'report output should use money() formatting', '--evidence', 'src/report.mjs:2 prints a raw number; money() exists now'])
     finding(['--kind', 'ambiguity', '--title', 'USD rate source for AC-3 is not defined', '--evidence', 'spec AC-3 names no rate source; no config in repo', '--item', 'W3', '--options', 'fixed 16000|env var|API'])
   }
   if (iter === 2) w('tests/existing.test.mjs', '// lane b "simplified" the existing suite\n') // locked: lane must be rejected

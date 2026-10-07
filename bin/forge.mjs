@@ -307,7 +307,7 @@ async function doctor() {
   ok('claude auth (needed by loop agents)', logged || !!process.env.ANTHROPIC_API_KEY, logged ? 'logged in' : process.env.ANTHROPIC_API_KEY ? 'ANTHROPIC_API_KEY set' : 'not logged in: run `claude` once and /login, or set ANTHROPIC_API_KEY')
   ok('node', true, process.version)
   ok('git', run(['git', '--version']).code === 0)
-  for (const name of Object.keys(LANES)) {
+  for (const name of Object.keys(LANES).filter((n) => n !== 'mock')) {
     const u = laneUsable(name)
     if (!u.ok) { ok(`jev lane ${name}`, false, u.why); continue }
     if (a.offline) { ok(`jev lane ${name}`, true, 'configured (not probed)'); continue }

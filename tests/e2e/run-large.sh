@@ -118,6 +118,7 @@ out=$(echo "{\"cwd\":\"$R\",\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\"
 [ "$out" = "{}" ] && pass "PreToolUse allows editable file" || fail "PreToolUse allows editable file: $out"
 
 export FORGE_AGENT_CMD="node $HERE/stub-agent.mjs"
+export FORGE_JEV_LANES=mock,zen FORGE_JEV_MOCK=$HERE/jev-mock.mjs
 out=$($FORGE run --foreground 2>&1); echo "$out" | tail -12
 expect "loop ends ESCALATED (W3 blocked)" "$out" '"state": "ESCALATED"'
 expect "stop reason" "$out" 'every remaining item is blocked'
@@ -131,15 +132,26 @@ ok("iter1 recorded the caught regression", (it[0].caught||[]).some(c=>c.id==="R-
 ok("iter2 lane b rejected for touching a locked file", it[1].lanes.some(l=>/REJECTED, touched locked files tests\/existing/.test(l)))
 ok("iter2 kept (W1 green, metric down)", it[1].verdict==="keep" && it[1].metric<=2000)
 ok("iter3 kept (W2 green)", it[2].verdict==="keep" && it[2].ac==="6/7")
+const small=(r)=>r.items.every(i=>i!=="W1")
+const r1=it[0].routes.find(small), r1a=it[0].routes.find(r=>r.items.includes("W1"))
+ok("routing: iter1 small-slice lane on haiku/low via jev", r1 && r1.model==="haiku" && r1.effort==="low" && r1.source==="jev:mock")
+ok("routing: W1 lane stays on sonnet", r1a && r1a.model==="sonnet")
+const r2=it[1].routes.find(small)
+ok("routing: after a discarded iteration the small lane is lifted off haiku", r2 && r2.model!=="haiku" && /failed once/.test(r2.why))
 ' $TD/iterations.json | tee -a /tmp/forge-e2e-asserts; grep -q FAIL /tmp/forge-e2e-asserts 2>/dev/null && FAIL=1; rm -f /tmp/forge-e2e-asserts
 
 f=$($FORGE findings)
-node -e '
+TD=$TD node -e '
 const f=JSON.parse(require("fs").readFileSync(0,"utf8"));const by=k=>f.find(x=>x.kind===k);const ok=(n,c)=>console.log((c?"PASS ":"FAIL ")+n)
 ok("spec_gap decided by orchestrator with a valid cite", by("spec_gap")?.status==="decided" && /^spec\.md:L\d+$/.test(by("spec_gap").decision.cite))
 ok("ambiguity with invalid cite auto-BLOCKED", by("ambiguity")?.status==="blocked" && by("ambiguity").decision.invalid===true)
 ok("preexisting bug noted as ticket proposal", by("preexisting_bug")?.status==="noted")
 ok("locked-file touch auto-rejected by policy, not BLOCKED", by("lock_violation")?.status==="rejected")
+const o=by("other"); const ng=require("fs").readFileSync(process.env.TD+"/spec.md","utf8").split("\n").findIndex(l=>/Changing report.mjs output/.test(l))+1
+ok("jev rejects the non-goal finding itself, citing the Non-goals line", o?.status==="rejected" && o.decision.by==="jev" && o.decision.cite==="spec.md:L"+ng)
+ok("orchestrator agent was never spawned for the jev-rejected finding", !require("fs").readdirSync(process.env.TD+"/agents").some(f=>f.includes("orchestrator-"+o?.id)))
+const sg=by("spec_gap")
+ok("orchestrator routed, never below sonnet", sg?.route?.model==="sonnet")
 ' <<< "$f" | tee /tmp/forge-e2e-asserts2; grep -q FAIL /tmp/forge-e2e-asserts2 && FAIL=1; rm -f /tmp/forge-e2e-asserts2
 
 rep=$(cat $TD/report.md)
@@ -147,6 +159,10 @@ expect "report lists BLOCKED with question options" "$rep" 'options: fixed 16000
 expect "report proposes new ticket" "$rep" 'report.line ignores currency formatting'
 expect "report shows W3 blocked" "$rep" 'W3 \[blocked\]'
 expect "report metric curve" "$rep" 'baseline 499500'
+expect "report shows model routing" "$rep" 'Model routing per iteration'
+expect "report attributes the jev decision" "$rep" 'rejected by jev'
+expect "results.tsv has a routes column" "$(head -1 $TD/results.tsv)" 'routes'
+expect "lane agent received its routed model" "$(cat $TD/agents/0001-lane-*.log)" 'model=haiku effort=low'
 
 # Learning: the regression that was caught becomes a repo instinct and shows up in the next task's clarify.
 out=$($FORGE learn list); expect "instinct captured from run evidence" "$out" 'regression:R-report'

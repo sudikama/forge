@@ -1,10 +1,20 @@
 {
   "name": "forge",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Continuous engineering loop for Claude Code: Jev-based size/clarity triage, a plan-clarify-build-test-revise harness for small tasks, and for large tasks goal+spec from Jira/Docs/PDF/PRD/Figma, codebase scope validation, detailed clarify (incl. subagent count without file collisions), spec lock, an autoresearch-style ratchet loop with an orchestrator, worktree lanes and a deterministic judge (happy/unhappy/edge/regression), BLOCKED findings, final report, and per-repo self-learning.",
-  "author": { "name": "Kama Adhitia" },
+  "author": {
+    "name": "Kama Adhitia"
+  },
   "license": "MIT",
-  "keywords": ["loop", "harness", "jev", "orchestrator", "subagents", "autoresearch", "testing"],
+  "keywords": [
+    "loop",
+    "harness",
+    "jev",
+    "orchestrator",
+    "subagents",
+    "autoresearch",
+    "testing"
+  ],
   "userConfig": {
     "jevLanes": {
       "type": "string",
@@ -12,12 +22,128 @@
       "description": "Comma-separated failover order of Jev backends: zen (opencode, keyless), commandcode (200/day), typesafe, openrouter",
       "default": "zen,commandcode"
     },
-    "COMMANDCODE_API_KEY": { "type": "string", "title": "CommandCode API key", "description": "Only for the commandcode lane", "default": "", "sensitive": true },
-    "TYPESAFE_API_KEY": { "type": "string", "title": "TypeSafe API key", "description": "Only for the typesafe lane (calibrated confidence)", "default": "", "sensitive": true },
-    "OPENROUTER_API_KEY": { "type": "string", "title": "OpenRouter API key", "description": "Only for the openrouter lane (alpha decisions API)", "default": "", "sensitive": true },
-    "jevTimeoutMs": { "type": "number", "title": "Jev timeout (ms)", "description": "Per-lane latency budget; on timeout the next lane is tried, then forge falls back deterministically", "default": 8000 },
-    "autoTriage": { "type": "boolean", "title": "Triage every prompt", "description": "Classify engineering prompts as clarify / small / large on submit", "default": true },
-    "maxWorkers": { "type": "number", "title": "Max parallel subagents", "description": "Hard cap on loop lanes (the recommendation also respects free RAM and Jev quota)", "default": 4 },
-    "smallMaxRevisions": { "type": "number", "title": "Small task: max revisions", "description": "Red test runs before the small harness escalates to you", "default": 3 }
+    "COMMANDCODE_API_KEY": {
+      "type": "string",
+      "title": "CommandCode API key",
+      "description": "Only for the commandcode lane",
+      "default": "",
+      "sensitive": true
+    },
+    "TYPESAFE_API_KEY": {
+      "type": "string",
+      "title": "TypeSafe API key",
+      "description": "Only for the typesafe lane (calibrated confidence)",
+      "default": "",
+      "sensitive": true
+    },
+    "OPENROUTER_API_KEY": {
+      "type": "string",
+      "title": "OpenRouter API key",
+      "description": "Only for the openrouter lane (alpha decisions API)",
+      "default": "",
+      "sensitive": true
+    },
+    "jevTimeoutMs": {
+      "type": "number",
+      "title": "Jev timeout (ms)",
+      "description": "Per-lane latency budget; on timeout the next lane is tried, then forge falls back deterministically",
+      "default": 8000
+    },
+    "autoTriage": {
+      "type": "boolean",
+      "title": "Triage every prompt",
+      "description": "Classify engineering prompts as clarify / small / large on submit",
+      "default": true
+    },
+    "maxWorkers": {
+      "type": "number",
+      "title": "Max parallel subagents",
+      "description": "Hard cap on loop lanes (the recommendation also respects free RAM and Jev quota)",
+      "default": 4
+    },
+    "smallMaxRevisions": {
+      "type": "number",
+      "title": "Small task: max revisions",
+      "description": "Red test runs before the small harness escalates to you",
+      "default": 3
+    },
+    "routeAgents": {
+      "type": "boolean",
+      "title": "Route loop agents",
+      "description": "Pick model + effort per loop lane/orchestrator with Jev (each is a fresh claude -p, no cache loss)",
+      "default": true
+    },
+    "fastModel": {
+      "type": "string",
+      "title": "Fast tier model",
+      "description": "Model for mechanical slices",
+      "default": "haiku"
+    },
+    "balancedModel": {
+      "type": "string",
+      "title": "Balanced tier model",
+      "description": "Model for ordinary slices (also the default)",
+      "default": "sonnet"
+    },
+    "deepModel": {
+      "type": "string",
+      "title": "Deep tier model",
+      "description": "Model for hard/risky slices and after repeated failures",
+      "default": "opus"
+    },
+    "maxEffort": {
+      "type": "string",
+      "title": "Highest effort",
+      "description": "Routing never goes above this: low, medium, high, xhigh",
+      "default": "high"
+    },
+    "minUpgradeConfidence": {
+      "type": "number",
+      "title": "Confidence to spend more",
+      "description": "Jev confidence needed to raise tier/effort",
+      "default": 0.3
+    },
+    "minDowngradeConfidence": {
+      "type": "number",
+      "title": "Confidence to spend less",
+      "description": "Jev confidence needed to lower tier/effort",
+      "default": 0.7
+    },
+    "jevDecide": {
+      "type": "boolean",
+      "title": "Jev pre-decides findings",
+      "description": "Reject a finding without an LLM call when Jev maps it to a spec exclusion line with high confidence",
+      "default": true
+    },
+    "jevRejectBar": {
+      "type": "number",
+      "title": "Jev reject confidence",
+      "description": "Confidence needed for Jev to reject a finding on its own",
+      "default": 0.6
+    },
+    "jevCompaction": {
+      "type": "boolean",
+      "title": "Jev compaction",
+      "description": "Verbatim Jev-guided compaction in interactive sessions (function hooks only)",
+      "default": true
+    },
+    "compactAtPercent": {
+      "type": "number",
+      "title": "Auto-compact at %",
+      "description": "Context percentage that triggers a compaction (function hooks only)",
+      "default": 60
+    },
+    "minReductionRatio": {
+      "type": "number",
+      "title": "Min compaction reduction",
+      "description": "Below this, the built-in summary is used instead",
+      "default": 0.25
+    },
+    "routeSessionSubagents": {
+      "type": "boolean",
+      "title": "Route session subagents",
+      "description": "Pick the model of Agent-tool subagents in interactive sessions (function hooks only)",
+      "default": true
+    }
   }
 }
