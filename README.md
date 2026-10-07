@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.3.0-orange">
+  <img alt="version" src="https://img.shields.io/badge/version-0.4.0-orange">
   <img alt="Claude Code" src="https://img.shields.io/badge/Claude%20Code-%E2%89%A5%202.1.280-black">
   <img alt="Node" src="https://img.shields.io/badge/node-%E2%89%A5%2020-339933">
   <img alt="dependencies" src="https://img.shields.io/badge/dependencies-none-lightgrey">
@@ -150,6 +150,8 @@ environment wins over the file. `claude plugin configure forge@forge-local` list
 | `jevDecide`, `jevRejectBar` | true, 0.6 | Let Jev reject a finding that matches a spec exclusion line with at least this confidence |
 | `jevCompaction`, `compactAtPercent` | true, 60 | Jev-guided compaction and its trigger (function hooks only) |
 | `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_TOKEN` | empty | Jira REST fallback when no Jira MCP is registered |
+| `reportCmd` | empty | Shell command for the `command` report target |
+| `extraInstincts` | empty | Optional read-only instinct store (same `<repo>/*.yaml` layout) merged into prompts |
 
 The full list with descriptions lives in [`.claude-plugin/plugin.json`](.claude-plugin/plugin.json).
 Every Jev call fails open, so an outage never blocks a session.
@@ -217,15 +219,16 @@ Skills and hooks drive the CLI for you; these commands are useful directly. Run
 
 ```
 forge doctor | triage "<request>"
-forge new <KEY> --mode small|large --title ".." --report-to file|jira:KEY|telegram:CHAT[:THREAD]
+forge new <KEY> --mode small|large --title ".." --report-to file|jira:KEY|webhook:URL|command
 forge source add --kind jira|gdoc|pdf|markdown|prd|figma|file (--ref X | --file P | --stdin)
 forge check | lanes | baseline | clarify | answer <ID> "<answer>" | lock --approve
 forge run | status | pause | stop | resume
 forge findings | report | learn list
 ```
 
-Telegram delivery uses the [`hermes send`](https://hermes-agent.nousresearch.com/docs) CLI if it is
-installed; `file` always writes `report.md`.
+Report targets: `file` always writes `report.md`; `jira:KEY` posts it as a comment; `webhook:URL` POSTs
+`{subject, report, path}` as JSON (Slack, Discord, n8n, anything); `command` runs the `reportCmd` option
+with `FORGE_REPORT_PATH` and `FORGE_REPORT_SUBJECT` set, for any notifier you already use.
 
 ## Development
 
@@ -237,6 +240,7 @@ bash tests/e2e/run-large.sh           # full large flow with a stub agent, deter
 bash tests/e2e/run-small.sh           # small harness, lane gate, live triage on Jev zen
 node tests/unit/route.test.mjs        # routing policy, model ladder, Jev finding decisions
 node tests/unit/forge-fn.test.mjs     # function hooks on a fake engine (LIVE=1 hits Jev zen)
+node tests/unit/deliver.test.mjs      # report delivery targets
 ```
 
 | Path | Contents |

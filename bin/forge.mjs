@@ -72,11 +72,11 @@ async function main() {
       return out(await triagePrompt(text))
     }
     case 'new': {
-      const key = a.key || a._[1] || die('forge new <KEY> --mode small|large --title "..." --report-to telegram,jira:KEY,file')
+      const key = a.key || a._[1] || die('forge new <KEY> --mode small|large --title "..." --report-to jira:KEY,webhook:URL,command,file')
       const mode = a.mode || die('--mode small|large is required')
       if (!['small', 'large'].includes(mode)) die('--mode must be small or large')
       const reportTo = String(a['report-to'] || '').split(',').map((s) => s.trim()).filter(Boolean)
-      if (mode === 'large' && !reportTo.length) die('--report-to is required for a large task: ask the owner where the final report goes (telegram[:chat[:thread]], jira:KEY, file)')
+      if (mode === 'large' && !reportTo.length) die('--report-to is required for a large task: ask the owner where the final report goes (jira:KEY, webhook:URL, command, file)')
       const t = T.createTask(root, { key, mode, title: a.title, reportTo })
       if (mode === 'small') { t.small = null; startSmall(t, { request: a.title || key }); t.small.session_id = a.session || null; T.saveTask(t) }
       return out({ created: key, mode, dir: t.dir, state: t.state, next: mode === 'small' ? 'write the plan: forge plan --stdin' : NEXT.INTAKE })
@@ -282,7 +282,7 @@ async function main() {
       return out(`forge: engineering loop for Claude Code
   doctor                         check Claude Code, Jev lanes, MCP servers, tools
   triage "<request>"             size + clarity triage (Jev prior + cues)
-  new <KEY> --mode small|large --title ".." --report-to telegram:CHAT:THREAD,jira:KEY,file
+  new <KEY> --mode small|large --title ".." --report-to jira:KEY,webhook:URL,command,file
   source add --kind jira|gdoc|pdf|markdown|prd|figma|file (--ref|--file|--stdin)
   template goal|spec|scope|matrix|worklist [--write]
   check                          validate artifacts, advance state, print next step
@@ -326,7 +326,8 @@ async function doctor() {
   }
   const pdf = run(['python3', '-c', 'import fitz']).code === 0 || run(['pdftotext', '-v']).code === 0
   ok('pdf extractor', pdf, pdf ? '' : 'none (pdftotext / pymupdf); the Read tool still reads PDFs in-session')
-  ok('hermes send (telegram reports)', run(['hermes', 'send', '--help']).code === 0)
+  const rc = option('reportCmd', '')
+  ok('report command', !!rc, rc ? 'set (report target: command)' : 'not set: only needed for the command report target (optional)')
   const shim = path.join(process.env.HOME, '.local', 'bin', 'forge')
   if (a['install-shim']) { fs.mkdirSync(path.dirname(shim), { recursive: true }); fs.writeFileSync(shim, `#!/bin/sh\nexec node "${path.join(PLUGIN_ROOT, 'bin', 'forge.mjs')}" "$@"\n`, { mode: 0o755 }) }
   ok('forge on PATH', fs.existsSync(shim), fs.existsSync(shim) ? shim : 'forge doctor --install-shim')

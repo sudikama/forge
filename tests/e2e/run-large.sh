@@ -4,7 +4,7 @@
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 FORGE="node $HERE/../../bin/forge.mjs"
-export FORGE_HOME=$HOME/.hermes/cache/scratch/forge-e2e/home
+export FORGE_HOME=${TMPDIR:-/tmp}/forge-e2e/home
 rm -rf "$FORGE_HOME"; mkdir -p "$FORGE_HOME"
 R=$(bash "$HERE/make-fixture.sh")
 cd "$R"

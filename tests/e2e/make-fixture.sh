@@ -2,7 +2,7 @@
 # Builds the E2E fixture repo for forge: a tiny node shop lib with an existing (regression)
 # suite, locked acceptance tests written at the base commit, and a deterministic metric.
 set -euo pipefail
-R=${1:-$HOME/.hermes/cache/scratch/forge-e2e/shop}
+R=${1:-${TMPDIR:-/tmp}/forge-e2e/shop}
 rm -rf "$R"; mkdir -p "$R"/{src,tests,bench}
 cd "$R"
 git init -q -b main

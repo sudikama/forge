@@ -1,6 +1,6 @@
 {
   "name": "forge",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Continuous engineering loop for Claude Code: Jev-based size/clarity triage, a plan-clarify-build-test-revise harness for small tasks, and for large tasks goal+spec from Jira/Docs/PDF/PRD/Figma, codebase scope validation, detailed clarify (incl. subagent count without file collisions), spec lock, an autoresearch-style ratchet loop with an orchestrator, worktree lanes and a deterministic judge (happy/unhappy/edge/regression), BLOCKED findings, final report, and per-repo self-learning.",
   "author": {
     "name": "Kama Adhitia"
@@ -54,6 +54,18 @@
       "title": "Triage every prompt",
       "description": "Classify engineering prompts as clarify / small / large on submit",
       "default": true
+    },
+    "reportCmd": {
+      "type": "string",
+      "title": "Report command",
+      "description": "Shell command used by the 'command' report target; receives FORGE_REPORT_PATH and FORGE_REPORT_SUBJECT",
+      "default": ""
+    },
+    "extraInstincts": {
+      "type": "string",
+      "title": "Extra instinct store",
+      "description": "Optional read-only directory of <repo>/*.yaml instincts merged into prompts",
+      "default": ""
     },
     "maxWorkers": {
       "type": "number",

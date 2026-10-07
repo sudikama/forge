@@ -3,9 +3,9 @@
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 FORGE="node $HERE/../../bin/forge.mjs"
-export FORGE_HOME=$HOME/.hermes/cache/scratch/forge-e2e/home-small
+export FORGE_HOME=${TMPDIR:-/tmp}/forge-e2e/home-small
 rm -rf "$FORGE_HOME"; mkdir -p "$FORGE_HOME"
-R=$(bash "$HERE/make-fixture.sh" $HOME/.hermes/cache/scratch/forge-e2e/small)
+R=$(bash "$HERE/make-fixture.sh" ${TMPDIR:-/tmp}/forge-e2e/small)
 cd "$R"
 FAIL=0
 expect() { if echo "$2" | grep -q -- "$3"; then echo "PASS $1"; else echo "FAIL $1 (wanted: $3)"; echo "$2" | head -8; FAIL=1; fi; }

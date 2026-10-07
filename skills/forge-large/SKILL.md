@@ -12,7 +12,7 @@ which prints what is still missing. `forge` = `node ${CLAUDE_PLUGIN_ROOT}/bin/fo
 
 ## 1. Intake
 1. Ask the owner (AskUserQuestion, one batch): the task key, where the final report goes
-   (`telegram:<chat>:<thread>`, `jira:<KEY>`, `file`), and every source of the task.
+   (`jira:<KEY>`, `webhook:<url>`, `command`, `file`), and every source of the task.
    Always ask for elaboration material: Jira ticket, Google Doc, PDF, markdown, PRD, Figma.
 2. `forge new <KEY> --mode large --title "..." --report-to <targets>`
 3. Freeze every source into the task (`forge source add`):
