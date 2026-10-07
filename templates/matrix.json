@@ -1,0 +1,11 @@
+{
+  "cases": [
+    { "id": "T-AC1-happy", "kind": "happy", "source": "AC-1", "items": ["W1"], "expect": "valid input returns 200 with body X", "cmd": "npx vitest run tests/ac1.test.ts -t happy" },
+    { "id": "T-AC1-unhappy", "kind": "unhappy", "source": "AC-1", "items": ["W1"], "expect": "invalid input returns 400, nothing persisted", "cmd": "npx vitest run tests/ac1.test.ts -t unhappy" },
+    { "id": "T-AC1-edge", "kind": "edge", "source": "AC-1", "items": ["W1"], "expect": "empty / max-length / unicode input handled", "cmd": "npx vitest run tests/ac1.test.ts -t edge" },
+    { "id": "R-caller", "kind": "regression", "covers": ["src/other/caller.ts"], "expect": "existing behaviour of caller unchanged", "cmd": "npx vitest run tests/other/caller.test.ts" }
+  ],
+  "waivers": [
+    { "ac": "AC-9", "kind": "edge", "reason": "pure config flag, no input domain" }
+  ]
+}

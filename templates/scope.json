@@ -1,0 +1,14 @@
+{
+  "in_scope": [
+    { "path": "src/module/file.ts", "ac": ["AC-1"], "evidence": "src/module/file.ts:42 handler that AC-1 changes", "new": false }
+  ],
+  "impacted": [
+    { "path": "src/other/caller.ts", "evidence": "src/other/caller.ts:17 calls the changed function", "tests": ["tests/other/caller.test.ts"] }
+  ],
+  "out_of_scope": [
+    { "item": "refactor of legacy module X", "why": "Non-goal (source: PRD 1.3)" }
+  ],
+  "conflicts": [
+    { "id": "K1", "summary": "spec assumes endpoint /v2/x exists", "evidence": "no route in src/routes.ts", "options": ["create it", "use /v1/x"], "recommendation": "use /v1/x" }
+  ]
+}

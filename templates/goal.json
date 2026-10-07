@@ -1,0 +1,25 @@
+{
+  "objective": "One sentence: what must be true when the loop is done.",
+  "test_cmd": "the FULL test command for the repo, e.g. npm test / pytest -q / go test ./...",
+  "regression_cmd": "the PRE-EXISTING suite only (new tests excluded); must stay green every iteration. Empty string if same as test_cmd",
+  "test_timeout_sec": 1800,
+  "metric": {
+    "name": "p95_ms",
+    "cmd": "command that prints the metric; the last number on stdout is used unless regex is set",
+    "regex": "",
+    "direction": "min",
+    "target": 200,
+    "min_delta": 0,
+    "timeout_sec": 900
+  },
+  "guards": [],
+  "budget": {
+    "max_iterations": 12,
+    "max_minutes": 240,
+    "plateau_n": 3,
+    "lane_max_turns": 60,
+    "lane_timeout_min": 30
+  },
+  "editable": ["src/**"],
+  "locked": ["tests/**", "bench/**"]
+}

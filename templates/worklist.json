@@ -1,0 +1,6 @@
+{
+  "items": [
+    { "id": "W1", "title": "vertical slice for AC-1", "ac": ["AC-1"], "size": "M", "writes": ["src/module/**"], "shared": [], "depends_on": [] },
+    { "id": "W2", "title": "vertical slice for AC-2", "ac": ["AC-2"], "size": "S", "writes": ["src/other/thing.ts"], "shared": ["package.json"], "depends_on": ["W1"] }
+  ]
+}
