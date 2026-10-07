@@ -29,7 +29,7 @@ which prints what is still missing. `forge` = `node ${CLAUDE_PLUGIN_ROOT}/bin/fo
 - goal.json: objective, test_cmd, regression_cmd (pre-existing suite only), metric
   (cmd, direction, target, measured not guessed), budget (max_iterations, max_minutes,
   plateau_n), editable globs, locked globs (evaluator, existing tests, bench).
-- spec.md: every section; every AC `- [ ] AC-n: ... (source: FORE-1#desc | PRD 3.2 | figma:1:2)`.
+- spec.md: every section; every AC `- [ ] AC-n: ... (source: PROJ-1#desc | PRD 3.2 | figma:1:2)`.
   Requirements without a source go to Assumptions.
 
 ## 3. Validate the codebase (before clarify)
