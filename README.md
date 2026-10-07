@@ -133,9 +133,9 @@ To update, run `claude plugin marketplace update forge-local && claude plugin up
 
 ## Configuration
 
-Set options with `claude plugin configure forge@forge-local`, or in `~/.forge/env` as
+Set options with `/plugin configure forge@forge-local` inside Claude Code, or in `~/.forge/env` as
 `FORGE_<OPTION>=value` (for example `FORGE_MAX_WORKERS=2`; API keys keep their own names). The process
-environment wins over the file.
+environment wins over the file. `claude plugin configure forge@forge-local` lists the current values.
 
 | Option | Default | Description |
 |---|---|---|
