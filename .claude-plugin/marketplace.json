@@ -1,7 +1,14 @@
 {
   "name": "forge-local",
-  "owner": { "name": "Kama Adhitia" },
+  "owner": {
+    "name": "Kama Adhitia"
+  },
   "plugins": [
-    { "name": "forge", "source": "./", "description": "Continuous engineering loop for Claude Code (triage, small harness, goal+spec orchestrated loop, self-learning)" }
-  ]
+    {
+      "name": "forge",
+      "source": "./",
+      "description": "Continuous engineering loop for Claude Code (triage, small harness, goal+spec orchestrated loop, self-learning)"
+    }
+  ],
+  "description": "Local marketplace for the forge engineering-loop plugin"
 }
