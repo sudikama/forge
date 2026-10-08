@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.4.0-orange">
+  <img alt="version" src="https://img.shields.io/badge/version-0.4.1-orange">
   <img alt="Claude Code" src="https://img.shields.io/badge/Claude%20Code-%E2%89%A5%202.1.280-black">
   <img alt="Node" src="https://img.shields.io/badge/node-%E2%89%A5%2020-339933">
   <img alt="dependencies" src="https://img.shields.io/badge/dependencies-none-lightgrey">
@@ -241,6 +241,7 @@ bash tests/e2e/run-small.sh           # small harness, lane gate, live triage on
 node tests/unit/route.test.mjs        # routing policy, model ladder, Jev finding decisions
 node tests/unit/forge-fn.test.mjs     # function hooks on a fake engine (LIVE=1 hits Jev zen)
 node tests/unit/deliver.test.mjs      # report delivery targets
+bash tests/e2e/run-layouts.sh         # submodules, worktrees, missing .git/info, non-git dirs
 ```
 
 | Path | Contents |
