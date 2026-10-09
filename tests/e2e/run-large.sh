@@ -7,6 +7,15 @@ FORGE="node $HERE/../../bin/forge.mjs"
 export FORGE_HOME=${TMPDIR:-/tmp}/forge-e2e/home
 rm -rf "$FORGE_HOME"; mkdir -p "$FORGE_HOME"
 R=$(bash "$HERE/make-fixture.sh")
+# FORGE_E2E_WORKTREE=1 runs the whole flow from a linked worktree (.git is a file there):
+# the primary checkout moves to another branch and main is checked out in the worktree.
+if [ "${FORGE_E2E_WORKTREE:-0}" = 1 ]; then
+  git -C "$R" checkout -q -b host
+  rm -rf "$R-wt"; git -C "$R" worktree add -q "$R-wt" main
+  R="$R-wt"
+  [ -f "$R/.git" ] || { echo "FAIL fixture is not a linked worktree"; exit 1; }
+  echo "worktree mode: $R"
+fi
 cd "$R"
 FAIL=0
 pass() { echo "PASS $1"; }

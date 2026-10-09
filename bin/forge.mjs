@@ -299,6 +299,8 @@ async function main() {
 async function doctor() {
   const rows = []
   const ok = (name, good, detail) => rows.push(`${good ? 'ok  ' : 'FAIL'} ${name}${detail ? `: ${detail}` : ''}`)
+  const fv = readJson(path.join(PLUGIN_ROOT, '.claude-plugin', 'plugin.json'), {}).version || 'unknown'
+  ok('forge', true, `${fv} from ${PLUGIN_ROOT}`)
   const v = run(['claude', '--version'])
   const ver = (v.stdout.match(/(\d+)\.(\d+)\.(\d+)/) || []).slice(1).map(Number)
   ok('claude code', v.code === 0 && (ver[0] > 2 || (ver[0] === 2 && (ver[1] > 1 || ver[2] >= 280))), v.stdout.trim() || v.stderr.trim())

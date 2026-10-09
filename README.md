@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.4.1-orange">
+  <img alt="version" src="https://img.shields.io/badge/version-0.4.2-orange">
   <img alt="Claude Code" src="https://img.shields.io/badge/Claude%20Code-%E2%89%A5%202.1.280-black">
   <img alt="Node" src="https://img.shields.io/badge/node-%E2%89%A5%2020-339933">
   <img alt="dependencies" src="https://img.shields.io/badge/dependencies-none-lightgrey">
@@ -242,6 +242,7 @@ node tests/unit/route.test.mjs        # routing policy, model ladder, Jev findin
 node tests/unit/forge-fn.test.mjs     # function hooks on a fake engine (LIVE=1 hits Jev zen)
 node tests/unit/deliver.test.mjs      # report delivery targets
 bash tests/e2e/run-layouts.sh         # submodules, worktrees, missing .git/info, non-git dirs
+FORGE_E2E_WORKTREE=1 bash tests/e2e/run-large.sh   # the large flow started from a linked worktree
 ```
 
 | Path | Contents |
@@ -265,6 +266,7 @@ In a target repository forge writes only to `.forge/` (excluded from git automat
 | `baseline ran at X but HEAD is Y` | a commit landed after the baseline; run `forge baseline` again |
 | Loop stops with `every remaining item is blocked` | answer the BLOCKED items in `report.md`, then open a follow-up task |
 | Only one worker | low free RAM or file collisions; see `forge lanes` |
+| `forge new` fails with `ENOTDIR` or `ENOENT` on `.git/info/exclude` | forge older than 0.4.1 in a worktree or submodule; update the plugin and start a new session (`/forge:doctor` shows the version) |
 
 Logs are in `~/.forge/logs/` and `.forge/tasks/<KEY>/runner.log`.
 
