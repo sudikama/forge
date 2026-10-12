@@ -1,5 +1,5 @@
 {
-  "description": "forge: prompt triage, tool gate (locks, lane ownership, irreversible commands), small-harness driver, session banner; function-hook module (needs CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1): Jev compaction, auto-compact, Agent-tool subagent model routing",
+  "description": "forge: prompt triage, tool gate (locks, lane ownership, irreversible commands, scope guard: review mode, plan files, dependencies, hashing), small-harness driver, session banner; function-hook module (needs CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1): Jev compaction, auto-compact, Agent-tool subagent model routing",
   "hooks": {
     "SessionStart": [
       {
@@ -42,6 +42,17 @@
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/bin/forge.mjs\" hook stop",
             "timeout": 1800
+          }
+        ]
+      }
+    ],
+    "UserPromptExpansion": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/bin/forge.mjs\" hook prompt",
+            "timeout": 10
           }
         ]
       }

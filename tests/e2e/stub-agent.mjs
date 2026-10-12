@@ -72,6 +72,12 @@ if (process.env.FORGE_STUB_MODE === 'w2-always-broken') {
   if (items.includes('W2')) w('src/fmt.mjs', `export function plain(n) { return String(n) }\nexport function money(n) { return 'Rp ' + n } // ${process.env.FORGE_MODEL} iter ${iter}\n`)
   process.exit(0)
 }
+// Thrash scenario: every iteration writes the same broken bytes, so the tree repeats.
+if (process.env.FORGE_STUB_MODE === 'w2-same-broken') {
+  if (items.includes('W1')) w('src/price.mjs', PRICE_BUGGY) // breaks the existing suite: discard every time
+  if (items.includes('W2')) w('src/fmt.mjs', `export function plain(n) { return String(n) }\nexport function money(n) { return 'Rp ' + n }\n`)
+  process.exit(0)
+}
 if (items.includes('W1')) {
   if (iter === 1) {
     w('src/price.mjs', PRICE_BUGGY) // linear but drops the qty default: breaks the existing suite

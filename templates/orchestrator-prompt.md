@@ -18,6 +18,10 @@ decision requires it: {{INTEGRATOR_OWNS}}
 ## Scope (cite as scope:in_scope:<path> | scope:out_of_scope:<item> | scope:impacted:<path>)
 {{SCOPE}}
 
+## Scope discipline
+Decide what the goal needs, not what would be nice: a request for a refactor, extra hardening, a new
+dependency or hashing with no consumer named in the spec/goal is reject (cite the Non-goal) or blocked.
+
 ## Decision rule (approved by the owner, clarify G1)
 - proceed: the spec/goal/clarify already answers it, OR the fix stays inside in-scope paths
   and changes no public contract. You MUST cite the exact line/key that justifies it.

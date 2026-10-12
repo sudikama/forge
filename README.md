@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.4.3-orange">
+  <img alt="version" src="https://img.shields.io/badge/version-0.5.0-orange">
   <img alt="Claude Code" src="https://img.shields.io/badge/Claude%20Code-%E2%89%A5%202.1.280-black">
   <img alt="Node" src="https://img.shields.io/badge/node-%E2%89%A5%2020-339933">
   <img alt="dependencies" src="https://img.shields.io/badge/dependencies-none-lightgrey">
@@ -54,6 +54,7 @@ compaction. Pass or fail always comes from test exit codes, a baseline, and a me
 - [Configuration](#configuration)
 - [Spec sources](#spec-sources)
 - [Model routing](#model-routing)
+- [Scope guard](#scope-guard)
 - [Self-learning](#self-learning)
 - [CLI reference](#cli-reference)
 - [Development](#development)
@@ -128,6 +129,9 @@ Then work as usual. Every prompt is triaged automatically:
 | `/forge:start <request \| ticket \| doc link>` | triage manually and start |
 | `/forge:status` | state, failing gates, loop progress, BLOCKED items |
 | `/forge:doctor` | check prerequisites |
+| `/forge:review <what>` | read-only review: edits and mutating commands are denied in this session |
+| `/forge:change <what>` | change mode: requested work plus necessary consequences; new deps and hashing ask first |
+| `/forge:guard [off]` | guard decisions per rule, or clear the session mode |
 
 To update, run `claude plugin marketplace update forge-local && claude plugin update forge@forge-local`.
 
@@ -144,6 +148,7 @@ environment wins over the file. `claude plugin configure forge@forge-local` list
 | `autoTriage` | true | Triage every engineering prompt |
 | `maxWorkers` | 4 | Hard cap on parallel subagents (also capped by free RAM, about 1.2 GB each) |
 | `smallMaxRevisions` | 3 | Red test runs before the small harness escalates |
+| `scopeGuard` | true | Scope guard in your session (review mode, plan files, deps, hashing); lanes are always guarded |
 | `fastModel`, `balancedModel`, `deepModel` | `haiku`, `claude-sonnet-5-5`, `claude-opus-5-5` | Model per tier |
 | `ladderFailsFast`, `ladderFailsBalanced`, `ladderFailsDeep` | 1, 2, 2 | Gate failures allowed on each tier before moving up, or before BLOCKED on the top tier |
 | `maxEffort` | high | Highest effort routing may pick |
@@ -204,6 +209,28 @@ Compaction and session subagent routing are function hooks (`hooks/forge-fn.js`)
 
 </details>
 
+## Scope guard
+
+Adapted from [Stop That Shit](https://github.com/lennney/stop-that-shit): finish the requested work in
+full, stop the work nobody asked for. Claude gets the **Stop Ladder** in its skills and every lane
+prompt (know the responsibility, start direct, expand only for a concrete gap, judge defenses by their
+effect, verify once and finish). The guard enforces only what it can observe:
+
+| Family | Rule | In a lane | In your session |
+|---|---|---|---|
+| I, intent | edits or mutating commands under `/forge:review` | n/a | deny (unknown commands ask) |
+| S, scope | writes outside `plan.files` + `plan.tests` during a small task's BUILD | owner-only files (since 0.1) | deny |
+| S, scope | new dependency (`npm add`, `pip install x`, a new key in a manifest) not in `allow.deps` | deny, file a finding | ask while a task or `/forge:change` is active, else record only |
+| H, hardening | new hashing (hash APIs in code, `sha256sum`) without `allow.hash` | deny, file a finding | same as above |
+| T, thrash | gate re-run on an unchanged workspace | the judge reuses the old verdict for a repeated tree; it still counts on the ladder | no re-run and no revision spent; twice in a row escalates |
+
+Restoring (`npm install`, `pip install -r ...`), version bumps, removals and edits to files that
+already hash are not flagged. `allow` lives in `goal.json` (large) or `plan.json` (small):
+`{"deps": ["zod"], "hash": true}`. Every decision is logged as metadata only (rule, decision, path or
+command head, never content) in `~/.forge/logs/guard.jsonl`; label a decision with
+`forge guard label <id> correct|incorrect` to track false positives. Set `scopeGuard` to `false` to turn
+the session part off; lanes are always guarded.
+
 ## Self-learning
 
 Instincts are stored per repository in `~/.forge/learn/repos/<repo>/` and come only from run
@@ -224,6 +251,7 @@ forge source add --kind jira|gdoc|pdf|markdown|prd|figma|file (--ref X | --file 
 forge check | lanes | baseline | clarify | answer <ID> "<answer>" | lock --approve
 forge run | status | pause | stop | resume
 forge findings | report | learn list
+forge guard [off|review|change] [--session ID] | guard label <id> correct|incorrect|unclear
 ```
 
 Report targets: `file` always writes `report.md`; `jira:KEY` posts it as a comment; `webhook:URL` POSTs
@@ -242,6 +270,8 @@ node tests/unit/route.test.mjs        # routing policy, model ladder, Jev findin
 node tests/unit/forge-fn.test.mjs     # function hooks on a fake engine (LIVE=1 hits Jev zen)
 node tests/unit/deliver.test.mjs      # report delivery targets
 bash tests/e2e/run-layouts.sh         # submodules, worktrees, missing .git/info, non-git dirs
+bash tests/e2e/run-guard.sh           # scope guard through the real hooks (review, plan, deps, hash, thrash)
+node tests/unit/guard.test.mjs        # guard rules as bad/good pairs
 FORGE_E2E_WORKTREE=1 bash tests/e2e/run-large.sh   # the large flow started from a linked worktree
 ```
 
@@ -277,6 +307,8 @@ Logs are in `~/.forge/logs/` and `.forge/tasks/<KEY>/runner.log`.
 - Function hooks are tested on a fake engine plus the live Jev zen lane, not yet in a real session.
 - Jev zen confidence is uncalibrated, so most findings still go to the Claude orchestrator.
 - Triage thresholds are calibrated on a small sample; use `forge triage` to check a misclassified request.
+- The guard reads tool input, not intent: a dependency added by a script it cannot see, or hashing
+  through an API it does not know, passes. It is a guardrail, not a sandbox.
 - Regression detection is only as strong as the existing tests plus the characterization tests written
   at baseline.
 
@@ -286,5 +318,6 @@ Logs are in `~/.forge/logs/` and `.forge/tasks/<KEY>/runner.log`.
 [karpathy/autoresearch](https://github.com/karpathy/autoresearch),
 [tamaratran/fast-jev-compaction](https://github.com/tamaratran/fast-jev-compaction) (vendored under MIT),
 [moelahmady/jev-model-router](https://github.com/moelahmady/jev-model-router),
-[ifoster01/jev-effort](https://github.com/ifoster01/jev-effort), and
-[shitianfang/jev-use](https://github.com/shitianfang/jev-use).
+[ifoster01/jev-effort](https://github.com/ifoster01/jev-effort),
+[shitianfang/jev-use](https://github.com/shitianfang/jev-use), and
+[lennney/stop-that-shit](https://github.com/lennney/stop-that-shit) (Stop Ladder and the S/H/I/T rules; hash API patterns adapted under MIT).

@@ -20,6 +20,15 @@
     "lane_max_turns": 60,
     "lane_timeout_min": 30
   },
-  "editable": ["src/**"],
-  "locked": ["tests/**", "bench/**"]
+  "editable": [
+    "src/**"
+  ],
+  "locked": [
+    "tests/**",
+    "bench/**"
+  ],
+  "allow": {
+    "deps": [],
+    "hash": false
+  }
 }

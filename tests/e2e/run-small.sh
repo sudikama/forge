@@ -58,8 +58,10 @@ out=$($FORGE learn list); expect "small task taught the test command" "$out" 'no
 $FORGE new FIX-2 --mode small --title "always red" >/dev/null
 echo '{"files":["src/x.mjs"],"test_cmd":"false","cases":[{"id":"h","kind":"happy","cmd":"false"},{"id":"u","kind":"unhappy","cmd":"true"},{"id":"e","kind":"edge","cmd":"true"}]}' | $FORGE plan --stdin >/dev/null
 $FORGE phase BUILD >/dev/null
-for i in 1 2 3; do stop >/dev/null; done
-out=$(stop); expect "escalates after 3 revisions instead of looping" "$out" 'still red after 3 revisions'
+# Each turn changes the code (a real but failing attempt), so this is the revision cap, not thrash.
+for i in 1 2 3 4; do echo "export const attempt = $i" > src/x.mjs; out=$(stop); done
+expect "escalates after 3 revisions instead of looping" "$out" 'still red after 3 revisions'
+rm -f src/x.mjs
 
 # forge stop ends a small task at once and the Stop hook stops driving it.
 $FORGE new FIX-3 --mode small --title "abandon me" >/dev/null

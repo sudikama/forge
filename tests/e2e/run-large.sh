@@ -5,6 +5,8 @@ set -uo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 FORGE="node $HERE/../../bin/forge.mjs"
 export FORGE_HOME=${TMPDIR:-/tmp}/forge-e2e/home
+# The flow needs 2 workers; on a busy box the free-RAM cap would pick 1 and change the scenario.
+export FORGE_WORKER_MEM_MB=${FORGE_WORKER_MEM_MB:-64}
 rm -rf "$FORGE_HOME"; mkdir -p "$FORGE_HOME"
 R=$(bash "$HERE/make-fixture.sh")
 # FORGE_E2E_WORKTREE=1 runs the whole flow from a linked worktree (.git is a file there):
@@ -212,6 +214,30 @@ ok("ladder: W1 done, W2 blocked by the ladder finding", st.find(i=>i.id==="W1").
 const rep=fs.readFileSync(process.argv[1]+"/report.md","utf8")
 ok("ladder: report lists it under BLOCKED with options", /still fails the gate after every model tier/.test(rep) && /clarify or split the item/.test(rep))
 ' $T3 | tee /tmp/forge-e2e-asserts3; grep -q FAIL /tmp/forge-e2e-asserts3 && FAIL=1; rm -f /tmp/forge-e2e-asserts3
+
+# Thrash: the same broken tree comes back; the judge is not re-run, the ladder still climbs.
+$FORGE new SHOP-4 --mode large --title thrash --report-to file >/dev/null
+cp $TD/{goal.json,spec.md,scope.json,worklist.json,matrix.json} $R/.forge/tasks/SHOP-4/
+$FORGE source add --kind markdown --file /tmp/forge-e2e-ticket.md >/dev/null
+$FORGE lanes >/dev/null; $FORGE baseline --force >/dev/null; $FORGE clarify >/dev/null
+T4=$R/.forge/tasks/SHOP-4
+for id in $(node -e 'const c=require(process.argv[1]);console.log(c.questions.map(q=>q.id).join(" "))' $T4/clarify.json); do
+  ans=$(node -e 'const c=require(process.argv[1]);const q=c.questions.find(x=>x.id===process.argv[2]);console.log(q.recommendation)' $T4/clarify.json $id)
+  [ "$id" = "E1" ] && ans=1
+  $FORGE answer "$id" "$ans" >/dev/null
+done
+$FORGE lock --approve >/dev/null
+out=$(FORGE_STUB_MODE=w2-same-broken FORGE_LADDER_FAILS_BALANCED=1 FORGE_LADDER_FAILS_DEEP=1 $FORGE run --foreground 2>&1)
+node -e '
+const it=require(process.argv[1]+"/iterations.json");const fs=require("fs");const ok=(n,c)=>console.log((c?"PASS ":"FAIL ")+n)
+const th=it.filter(i=>(i.why||[]).some(w=>/thrash, judge not re-run/.test(w)))
+ok("thrash: a repeated tree reuses the old verdict ("+th.map(i=>i.iter).join(",")+")", th.length>=1 && th.every(i=>i.verdict==="discard"))
+ok("thrash: the first time the tree is judged for real", !(it[0].why||[]).some(w=>/thrash/.test(w)))
+const led=fs.readFileSync(process.argv[1]+"/ledger.md","utf8")
+ok("thrash: ledger notes it", /thrash, tree equals iteration/.test(led))
+const w2=it.map(i=>(i.routes||[]).find(r=>r.items.includes("W2"))).filter(Boolean).map(r=>r.model)
+ok("thrash still counts on the ladder ("+w2.join(" > ")+")", w2.includes("claude-opus-5-5"))
+' $T4 | tee /tmp/forge-e2e-asserts4; grep -q FAIL /tmp/forge-e2e-asserts4 && FAIL=1; rm -f /tmp/forge-e2e-asserts4
 
 # The loop never touched the base branch.
 [ "$(git -C $R rev-parse --abbrev-ref HEAD)" = "main" ] && [ "$(git -C $R log --oneline main | wc -l)" = "1" ] && pass "base branch untouched (forge never merges)" || fail "base branch untouched"

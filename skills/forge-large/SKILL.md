@@ -32,6 +32,10 @@ which prints what is still missing. `forge` = `node ${CLAUDE_PLUGIN_ROOT}/bin/fo
 - spec.md: every section; every AC `- [ ] AC-n: ... (source: PROJ-1#desc | PRD 3.2 | figma:1:2)`.
   Requirements without a source go to Assumptions.
 
+Goal `allow`: list a dependency in `allow.deps` or set `allow.hash` only when a source or the
+owner requires it (name the consumer in the spec). Lanes are denied anything else and file a
+finding instead.
+
 ## 3. Validate the codebase (before clarify)
 Write scope.json with evidence (`file:line`) for everything:
 - in_scope: paths the change edits, mapped to ACs (new files: `"new": true`)

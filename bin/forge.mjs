@@ -284,6 +284,16 @@ async function main() {
       return die('forge learn list|correct|contradict <id>')
     }
     case 'hook': return handleHook(a._[1])
+    case 'guard': {
+      const G = await import('../lib/guard.mjs')
+      const sid = a.session || process.env.CLAUDE_CODE_SESSION_ID || null
+      if (a._[1] === 'off' || a._[1] === 'review' || a._[1] === 'change') {
+        if (!sid) die('no session id (pass --session <id>)')
+        return out({ session: sid, mode: G.setSessionMode(sid, a._[1]) || 'off' })
+      }
+      if (a._[1] === 'label') return out(G.label(a._[2] || die('forge guard label <id> correct|incorrect|unclear'), a._[3]))
+      return out({ session: sid, mode: sid ? G.sessionMode(sid) || 'none' : 'unknown', ...G.summary(Number(a.n || 15)) })
+    }
     case 'jev': {
       const r = await ask({ text: a._.slice(1).join(' ') }, { q: noul(a.q || 'Is this text a request to change software?') }, { purpose: 'cli' })
       return out(r)
@@ -302,7 +312,8 @@ async function main() {
   lock --approve                 spec lock (owner approval) | run | status | pause | stop | resume
   finding --kind K --title T --evidence E [--item W1]   (lanes report to the orchestrator)
   report [--regenerate] | learn list|correct|contradict
-  plan --stdin | phase P         small-task harness`)
+  plan --stdin | phase P         small-task harness
+  guard [off|review|change] [--session ID] | guard label <id> correct|incorrect|unclear`)
   }
 }
 
