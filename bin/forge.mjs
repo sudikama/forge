@@ -207,6 +207,16 @@ async function main() {
     }
     case 'pause': case 'stop': case 'resume': {
       const t = task()
+      if (cmd === 'stop' && T.TERMINAL.includes(t.state)) return out({ control: 'stop', state: t.state, note: 'task already ended' })
+      if (t.mode === 'small') {
+        if (cmd !== 'stop') die('pause/resume apply to the large-task loop only')
+        T.setState(t, 'STOPPED', 'stopped by owner')
+        return out({ control: 'stop', state: 'STOPPED' })
+      }
+      if (cmd === 'stop' && t.state === 'RUNNING' && !T.runnerAlive(t)) {
+        const r = await finish(t.root, t.key, 'stopped by owner')
+        return out({ control: 'stop', state: T.loadTask(t.root, t.key).state, note: 'runner was not alive; finished now', report: r?.reportPath || r?.report || null })
+      }
       fs.writeFileSync(T.art(t, 'control'), (cmd === 'resume' ? 'run' : cmd) + '\n')
       T.event(t, `control ${cmd}`)
       return out({ control: cmd, note: cmd === 'resume' ? 'run forge run again to restart the runner' : 'takes effect at the next iteration boundary' })

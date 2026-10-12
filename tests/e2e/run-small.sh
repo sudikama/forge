@@ -44,6 +44,14 @@ export function money(n) {
 EOF
 out=$(stop); expect "Stop lets the turn end when green" "$out" 'Task FIX-1 is DONE'
 out=$(stop); [ "$out" = "{}" ] && echo "PASS no more blocking after DONE" || { echo "FAIL still blocking: $out"; FAIL=1; }
+# After DONE the push guard must let go (regression: state stayed RUNNING and blocked git push).
+pt() { echo "{\"cwd\":\"$R\",\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"$1\"}}" | $FORGE hook pretooluse; }
+out=$(node -e 'console.log(require(process.argv[1]).state)' "$R/.forge/tasks/FIX-1/task.json"); [ "$out" = "DONE" ] && echo "PASS small task state is DONE when the phase is DONE" || { echo "FAIL small task state is $out"; FAIL=1; }
+out=$(pt "git push origin HEAD"); [ "$out" = "{}" ] && echo "PASS git push allowed after the small task is DONE" || { echo "FAIL push still denied: $out"; FAIL=1; }
+# A task.json written by forge < 0.4.3 (state RUNNING, phase DONE) is healed on read.
+node -e 'const f=process.argv[1],j=require(f);j.state="RUNNING";require("fs").writeFileSync(f,JSON.stringify(j,null,2))' "$R/.forge/tasks/FIX-1/task.json"
+out=$(pt "git push origin HEAD"); [ "$out" = "{}" ] && echo "PASS legacy RUNNING+DONE task does not block push" || { echo "FAIL legacy task blocks push: $out"; FAIL=1; }
+out=$($FORGE status); expect "status reports the healed small task" "$out" '"phase": "DONE"'
 out=$($FORGE learn list); expect "small task taught the test command" "$out" 'node --test tests/existing.test.mjs'
 
 # Escalation after the revision cap.
@@ -52,6 +60,21 @@ echo '{"files":["src/x.mjs"],"test_cmd":"false","cases":[{"id":"h","kind":"happy
 $FORGE phase BUILD >/dev/null
 for i in 1 2 3; do stop >/dev/null; done
 out=$(stop); expect "escalates after 3 revisions instead of looping" "$out" 'still red after 3 revisions'
+
+# forge stop ends a small task at once and the Stop hook stops driving it.
+$FORGE new FIX-3 --mode small --title "abandon me" >/dev/null
+out=$($FORGE stop); expect "forge stop ends a small task" "$out" '"state": "STOPPED"'
+out=$(stop); [ "$out" = "{}" ] && echo "PASS Stop hook ignores a stopped small task" || { echo "FAIL stopped task still driven: $out"; FAIL=1; }
+
+# Large task: push is denied only while a runner process is really alive.
+$FORGE new BIG-1 --mode large --title big --report-to file >/dev/null
+setrun() { node -e 'const f=process.argv[1],j=require(f);j.state="RUNNING";j.runner_pid=Number(process.argv[2]);require("fs").writeFileSync(f,JSON.stringify(j,null,2))' "$R/.forge/tasks/BIG-1/task.json" "$1"; }
+sleep 30 & LIVE=$!
+setrun $LIVE
+out=$(pt "git push origin HEAD"); expect "push denied while the loop runner is alive" "$out" 'is running a loop'
+kill $LIVE; wait $LIVE 2>/dev/null
+out=$(pt "git push origin HEAD"); [ "$out" = "{}" ] && echo "PASS push allowed once the runner is dead" || { echo "FAIL push denied with a dead runner: $out"; FAIL=1; }
+out=$($FORGE stop); expect "forge stop finishes a loop whose runner died" "$out" '"state": "STOPPED"'
 
 # Lane gate: inside a worktree marked as lane a, ownership + locks + git are enforced.
 mkdir -p $R/lanewt && echo '{"lane":"a","role":"lane","owns":["src/price.mjs"],"locked":["tests/**","bench/**"]}' > $R/lanewt/.forge-lane

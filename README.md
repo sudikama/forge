@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-0.4.2-orange">
+  <img alt="version" src="https://img.shields.io/badge/version-0.4.3-orange">
   <img alt="Claude Code" src="https://img.shields.io/badge/Claude%20Code-%E2%89%A5%202.1.280-black">
   <img alt="Node" src="https://img.shields.io/badge/node-%E2%89%A5%2020-339933">
   <img alt="dependencies" src="https://img.shields.io/badge/dependencies-none-lightgrey">
@@ -266,6 +266,7 @@ In a target repository forge writes only to `.forge/` (excluded from git automat
 | `baseline ran at X but HEAD is Y` | a commit landed after the baseline; run `forge baseline` again |
 | Loop stops with `every remaining item is blocked` | answer the BLOCKED items in `report.md`, then open a follow-up task |
 | Only one worker | low free RAM or file collisions; see `forge lanes` |
+| `git push` denied with `task X is running a loop` after the task is done | forge older than 0.4.3; update the plugin (0.4.3 heals the stale task on read) |
 | `forge new` fails with `ENOTDIR` or `ENOENT` on `.git/info/exclude` | forge older than 0.4.1 in a worktree or submodule; update the plugin and start a new session (`/forge:doctor` shows the version) |
 
 Logs are in `~/.forge/logs/` and `.forge/tasks/<KEY>/runner.log`.
